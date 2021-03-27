@@ -12,13 +12,18 @@ const Styling = createGlobalStyle`
         stroke-width: 2px;
     }
 
-    circle {
-        fill: grey;
-    }
-
-    div#tooltip {
+    #tooltip {
         position: absolute;
         opacity: 0;
+        ul {
+            margin: 10px;
+            padding: 0;
+            
+        }
+        li {
+            margin: 0;
+            padding: 0;
+        }
     }
 `;
 
@@ -60,9 +65,11 @@ const drawDots = (
         .attr("cx", (d) => (d?.date ? X_SCALE(d.date) : 0))
         .attr("cy", (d) => Y_SCALE(d[key]))
         .attr("r", RADIUS)
+        .attr("fill", d3.schemeAccent[lastColorIndex])
         .on("mouseover", displayTooltip)
         .on("mouseout", hideTooltip)
         .on("mousemove", moveTooltip);
+    lastColorIndex++;
 };
 
 const displayTooltip = (_e: any, d: IDateAmount) => {
@@ -84,8 +91,8 @@ const hideTooltip = () => {
 
 const moveTooltip = (e: any) => {
     d3.select("#tooltip")
-        .style("left", e.clientX + 10 + "px")
-        .style("top", e.clientY + 10 + "px");
+        .style("left", e.clientX + "px")
+        .style("top", e.clientY + "px");
 };
 
 const createGraph = async () => {
@@ -139,6 +146,8 @@ const createGraph = async () => {
     // lines
     drawLine(svg, parsedData, "close");
     drawLine(svg, parsedData, "open");
+
+    lastColorIndex = 0;
 
     // dots
     drawDots(svg, parsedData, "close");
