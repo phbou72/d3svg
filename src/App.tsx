@@ -38,17 +38,22 @@ const createGraph = async () => {
     const xScale = d3.scaleTime().range([0, width]);
     const yScale = d3.scaleLinear().range([height, 0]);
 
-    // svg line
-    const valueLine = d3
+    // svg lines
+    const valueLineClose = d3
         .line<IDateAmount>()
         .x((d) => (d?.date ? xScale(d.date) : 0))
         .y((d) => yScale(d.close));
+    const valueLineCloseOpen = d3
+        .line<IDateAmount>()
+        .x((d) => (d?.date ? xScale(d.date) : 0))
+        .y((d) => yScale(d.open));
 
     let data = dateAmount.split("\n").map((row) => {
-        const [date, close] = row.split(",");
+        const [date, close, open] = row.split(",");
         return {
             date,
             close,
+            open,
         };
     });
 
@@ -57,6 +62,7 @@ const createGraph = async () => {
         parsedData.push({
             date: d3.timeParse("%d-%b-%y")(d.date),
             close: parseFloat(d.close),
+            open: parseFloat(d.open),
         });
     });
 
@@ -90,29 +96,56 @@ const createGraph = async () => {
         .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
     // lines
-    svg.append("path").data([parsedData]).attr("class", "line").attr("d", valueLine);
+    svg.append("path").data([parsedData]).attr("class", "line").attr("d", valueLineClose);
+    svg.append("path").data([parsedData]).attr("class", "line").attr("d", valueLineCloseOpen);
+
+    const displayTooltip = (_e: any, d: IDateAmount) => {
+        const { date, ...rest } = d;
+
+        let result = "<ul>";
+        Object.entries(rest).forEach((pair) => {
+            const [key, value] = pair;
+            result += `<li>${key}: ${value}</li>`;
+        });
+        result += "</ul>";
+
+        d3.select("#tooltip").style("opacity", 1).html(result);
+    };
+
+    const hideTooltip = () => {
+        d3.select("#tooltip").style("opacity", 0);
+    };
+
+    const moveTooltip = (e: any) => {
+        d3.select("#tooltip")
+            .style("left", e.clientX + 10 + "px")
+            .style("top", e.clientY + 10 + "px");
+    };
 
     // dots
-    const dots = svg.append("g").attr("class", "dots").selectAll("circle").data(parsedData);
-    dots.enter()
+    const dotsClosed = svg.append("g").attr("class", "dots").selectAll("circle").data(parsedData);
+    dotsClosed
+        .enter()
         .append("circle")
         .attr("cx", (d) => (d?.date ? xScale(d.date) : 0))
-        .attr("cy", (d) => yScale(d.close))
+        .attr("cy", (d) => yScale(d["close"]))
         .attr("r", radius)
         .attr("fill", "#69b3a2")
-        .on("mouseover", (_e, d) => {
-            console.log(d);
-            d3.select("#tooltip").style("opacity", 1).text(d.close);
-        })
-        .on("mouseout", function () {
-            d3.select("#tooltip").style("opacity", 0);
-        })
-        .on("mousemove", function (e) {
-            // console.log(e);
-            d3.select("#tooltip")
-                .style("left", e.clientX + 10 + "px")
-                .style("top", e.clientY + 10 + "px");
-        });
+        .on("mouseover", displayTooltip)
+        .on("mouseout", hideTooltip)
+        .on("mousemove", moveTooltip);
+
+    const dotsOpen = svg.append("g").attr("class", "dots").selectAll("circle").data(parsedData);
+    dotsOpen
+        .enter()
+        .append("circle")
+        .attr("cx", (d) => (d?.date ? xScale(d.date) : 0))
+        .attr("cy", (d) => yScale(d["open"]))
+        .attr("r", radius)
+        .attr("fill", "#69b3a2")
+        .on("mouseover", displayTooltip)
+        .on("mouseout", hideTooltip)
+        .on("mousemove", moveTooltip);
 
     // axis
     svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
