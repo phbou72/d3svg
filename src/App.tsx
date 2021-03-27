@@ -13,9 +13,12 @@ const Styling = createGlobalStyle`
         stroke-width: 2px;
     }
 
-    div.tooltip {
+    div#tooltip {
         position: absolute;
-        text-align: center;
+        opacity: 0;
+
+        /* text-align: center;
+
         width: 60px;
         height: 28px;
         padding: 2px;
@@ -23,7 +26,7 @@ const Styling = createGlobalStyle`
         background: lightsteelblue;
         border: 0px;
         border-radius: 8px;	
-        pointer-events: none;
+        pointer-events: none; */
     }
 `;
 
@@ -31,9 +34,11 @@ const createGraph = async () => {
     const margin = { top: 20, right: 20, bottom: 50, left: 70 };
     const width = 960 - margin.left - margin.right;
     const height = 500 - margin.top - margin.bottom;
+    const radius = 5;
     const xScale = d3.scaleTime().range([0, width]);
     const yScale = d3.scaleLinear().range([height, 0]);
 
+    // svg line
     const valueLine = d3
         .line<IDateAmount>()
         .x((d) => (d?.date ? xScale(d.date) : 0))
@@ -88,20 +93,32 @@ const createGraph = async () => {
     svg.append("path").data([parsedData]).attr("class", "line").attr("d", valueLine);
 
     // dots
-    svg.append("g")
-        .attr("class", "dots")
-        .selectAll("circle")
-        .data(parsedData)
-        .enter()
+    const dots = svg.append("g").attr("class", "dots").selectAll("circle").data(parsedData);
+    dots.enter()
         .append("circle")
         .attr("cx", (d) => (d?.date ? xScale(d.date) : 0))
         .attr("cy", (d) => yScale(d.close))
-        .attr("r", 5)
-        .attr("fill", "#69b3a2");
+        .attr("r", radius)
+        .attr("fill", "#69b3a2")
+        .on("mouseover", (_e, d) => {
+            console.log(d);
+            d3.select("#tooltip").style("opacity", 1).text(d.close);
+        })
+        .on("mouseout", function () {
+            d3.select("#tooltip").style("opacity", 0);
+        })
+        .on("mousemove", function (e) {
+            // console.log(e);
+            d3.select("#tooltip")
+                .style("left", e.clientX + 10 + "px")
+                .style("top", e.clientY + 10 + "px");
+        });
 
     // axis
     svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
     svg.append("g").call(d3.axisLeft(yScale));
+
+    d3.select("body").append("div").attr("id", "tooltip");
 };
 
 const App = () => {
