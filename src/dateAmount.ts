@@ -15,10 +15,4 @@ const data = `01-May-20,58.13,629.00
 11-Apr-20,626.20,67.00
 10-Apr-20,628.44,50.2`;
 
-export interface IDateAmount {
-    date: Date | null;
-    close: number;
-    open: number;
-}
-
 export default data;

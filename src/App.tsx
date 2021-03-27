@@ -4,7 +4,9 @@ import { createGlobalStyle } from "styled-components";
 import * as d3 from "d3";
 import "d3-time-format";
 
-import dateAmount, { IDateAmount } from "./dateAmount";
+import dateAmount from "./dateAmount";
+
+type AxisLabel = [xLabel: string, yLabel: string];
 
 const Styling = createGlobalStyle`
     [class^="line"] {
@@ -12,7 +14,7 @@ const Styling = createGlobalStyle`
         stroke-width: 2px;
     }
 
-    #tooltip {
+    div#tooltip {
         position: absolute;
         opacity: 0;
         ul {
@@ -36,34 +38,49 @@ const Y_SCALE = d3.scaleLinear().range([HEIGHT, 0]);
 
 let lastColorIndex = 0;
 
+const drawAllLines = (svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>, data: IDateValues[]) => {
+    Object.entries(data[0]).forEach((pair) => {
+        const [key] = pair;
+        drawLine(svg, data, ["date", key]);
+    });
+};
+
 const drawLine = (
     svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>,
-    data: IDateAmount[],
-    key: keyof Omit<IDateAmount, "date">
+    data: IDateValues[],
+    axisLabel: AxisLabel
 ) => {
+    const [xLabel, yLabel] = axisLabel;
     const valueLine = d3
-        .line<IDateAmount>()
-        .x((d) => (d?.date ? X_SCALE(d.date) : 0))
-        .y((d) => Y_SCALE(d[key]));
+        .line<IDateValues>()
+        .x((d) => (d?.date ? X_SCALE(d[xLabel]) : 0))
+        .y((d) => Y_SCALE(d[yLabel]));
     svg.append("path")
         .data([data])
-        .attr("class", "line-" + key)
+        .attr("class", "line-" + yLabel)
         .attr("d", valueLine)
         .attr("stroke", d3.schemeAccent[lastColorIndex]);
     lastColorIndex++;
 };
 
+const drawAllDots = (svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>, data: IDateValues[]) => {
+    Object.entries(data[0]).forEach((pair) => {
+        const [key] = pair;
+        drawDots(svg, data, ["date", key]);
+    });
+};
+
 const drawDots = (
     svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>,
-    data: IDateAmount[],
-    key: keyof Omit<IDateAmount, "date">
+    data: IDateValues[],
+    axisLabel: AxisLabel
 ) => {
-    const dotsClosed = svg.append("g").attr("class", "dots").selectAll("circle").data(data);
-    dotsClosed
-        .enter()
+    const [xLabel, yLabel] = axisLabel;
+    const dots = svg.append("g").attr("class", "dots").selectAll("circle").data(data);
+    dots.enter()
         .append("circle")
-        .attr("cx", (d) => (d?.date ? X_SCALE(d.date) : 0))
-        .attr("cy", (d) => Y_SCALE(d[key]))
+        .attr("cx", (d) => (d?.date ? X_SCALE(d[xLabel]) : 0))
+        .attr("cy", (d) => Y_SCALE(d[yLabel]))
         .attr("r", RADIUS)
         .attr("fill", d3.schemeAccent[lastColorIndex])
         .on("mouseover", displayTooltip)
@@ -72,7 +89,7 @@ const drawDots = (
     lastColorIndex++;
 };
 
-const displayTooltip = (_e: any, d: IDateAmount) => {
+const displayTooltip = (_e: any, d: IDateValues) => {
     const { date, ...rest } = d;
 
     let result = "<ul>";
@@ -82,17 +99,17 @@ const displayTooltip = (_e: any, d: IDateAmount) => {
     });
     result += "</ul>";
 
-    d3.select("#tooltip").style("opacity", 1).html(result);
+    d3.select("div#tooltip").style("opacity", 1).html(result);
 };
 
 const hideTooltip = () => {
-    d3.select("#tooltip").style("opacity", 0);
+    d3.select("div#tooltip").style("opacity", 0);
 };
 
 const moveTooltip = (e: any) => {
-    d3.select("#tooltip")
-        .style("left", e.clientX + "px")
-        .style("top", e.clientY + "px");
+    d3.select("div#tooltip")
+        .style("left", e.clientX + 10 + "px")
+        .style("top", e.clientY + 10 + "px");
 };
 
 const createGraph = async () => {
@@ -105,10 +122,10 @@ const createGraph = async () => {
         };
     });
 
-    let parsedData: IDateAmount[] = [];
+    let parsedData: IDateValues[] = [];
     data.forEach((d) => {
         parsedData.push({
-            date: d3.timeParse("%d-%b-%y")(d.date),
+            date: d3.timeParse("%d-%b-%y")(d.date) as Date,
             close: parseFloat(d.close),
             open: parseFloat(d.open),
         });
@@ -143,15 +160,11 @@ const createGraph = async () => {
         .append("g")
         .attr("transform", `translate(${MARGINS.left}, ${MARGINS.top})`);
 
-    // lines
-    drawLine(svg, parsedData, "close");
-    drawLine(svg, parsedData, "open");
+    drawAllLines(svg, parsedData);
 
     lastColorIndex = 0;
 
-    // dots
-    drawDots(svg, parsedData, "close");
-    drawDots(svg, parsedData, "open");
+    drawAllDots(svg, parsedData);
 
     // axis
     svg.append("g").attr("transform", `translate(0, ${HEIGHT})`).call(d3.axisBottom(X_SCALE));
