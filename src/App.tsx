@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createGlobalStyle } from "styled-components";
 
 import * as d3 from "d3";
@@ -38,18 +38,14 @@ const Y_SCALE = d3.scaleLinear().range([HEIGHT, 0]);
 
 let lastColorIndex = 0;
 
-const drawAllLines = (svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>, data: IDateValues[]) => {
+const drawAllLines = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[]) => {
     Object.entries(data[0]).forEach((pair) => {
         const [key] = pair;
         drawLine(svg, data, ["date", key]);
     });
 };
 
-const drawLine = (
-    svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>,
-    data: IDateValues[],
-    axisLabel: AxisLabel
-) => {
+const drawLine = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[], axisLabel: AxisLabel) => {
     const [xLabel, yLabel] = axisLabel;
     const valueLine = d3
         .line<IDateValues>()
@@ -63,18 +59,14 @@ const drawLine = (
     lastColorIndex++;
 };
 
-const drawAllDots = (svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>, data: IDateValues[]) => {
+const drawAllDots = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[]) => {
     Object.entries(data[0]).forEach((pair) => {
         const [key] = pair;
         drawDots(svg, data, ["date", key]);
     });
 };
 
-const drawDots = (
-    svg: d3.Selection<SVGGElement, unknown, HTMLElement, any>,
-    data: IDateValues[],
-    axisLabel: AxisLabel
-) => {
+const drawDots = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[], axisLabel: AxisLabel) => {
     const [xLabel, yLabel] = axisLabel;
     const dots = svg.append("g").attr("class", "dots").selectAll("circle").data(data);
     dots.enter()
@@ -112,7 +104,7 @@ const moveTooltip = (e: any) => {
         .style("top", e.clientY + 10 + "px");
 };
 
-const createGraph = async () => {
+const createGraph = async (rootElement: HTMLDivElement) => {
     let data = dateAmount.split("\n").map((row) => {
         const [date, close, open] = row.split(",");
         return {
@@ -152,7 +144,7 @@ const createGraph = async () => {
 
     // canvas
     const svg = d3
-        .select("#chart")
+        .select(rootElement)
         .html("")
         .append("svg")
         .attr("width", WIDTH + MARGINS.left + MARGINS.right)
@@ -175,12 +167,17 @@ const createGraph = async () => {
 };
 
 const App = () => {
+    const ref = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
-        createGraph();
-    }, []);
+        if (ref.current) {
+            createGraph(ref.current);
+        }
+    }, [ref]);
 
     return (
-        <div id="chart">
+        <div ref={ref}>
+            <svg />
             <Styling />
         </div>
     );
