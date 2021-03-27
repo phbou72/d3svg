@@ -6,8 +6,6 @@ import "d3-time-format";
 
 import dateAmount, { IDateAmount } from "./dateAmount";
 
-const parseTime = d3.timeParse("%d-%b-%y");
-
 const Styling = createGlobalStyle`
     .line {
         fill: none;
@@ -48,7 +46,7 @@ const createGraph = async () => {
     let parsedData: IDateAmount[] = [];
     data.forEach((d) => {
         parsedData.push({
-            date: parseTime(d.date),
+            date: d3.timeParse("%d-%b-%y")(d.date),
             close: parseFloat(d.close),
         });
     });
