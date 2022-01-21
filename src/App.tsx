@@ -1,183 +1,105 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { createGlobalStyle } from "styled-components";
 
 import * as d3 from "d3";
 import "d3-time-format";
 
-import dateAmount from "./dateAmount";
-
-type AxisLabel = [xLabel: string, yLabel: string];
+import dataset from "./dataset";
 
 const Styling = createGlobalStyle`
     [class^="line"] {
         fill: none;
-        stroke-width: 2px;
-    }
-
-    div#tooltip {
-        position: absolute;
-        opacity: 0;
-        ul {
-            margin: 10px;
-            padding: 0;
-            
-        }
-        li {
-            margin: 0;
-            padding: 0;
-        }
     }
 `;
 
-const RADIUS = 4;
-const MARGINS = { top: 20, right: 20, bottom: 50, left: 70 };
-const WIDTH = 960 - MARGINS.left - MARGINS.right;
-const HEIGHT = 500 - MARGINS.top - MARGINS.bottom;
-const X_SCALE = d3.scaleTime().range([0, WIDTH]);
-const Y_SCALE = d3.scaleLinear().range([HEIGHT, 0]);
+interface Scales {
+    xScale: d3.ScaleTime<number, number, never>;
+    yScale: d3.ScaleLinear<number, number, never>;
+}
 
-let lastColorIndex = 0;
+interface Margins {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+}
 
-const drawAllLines = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[]) => {
-    Object.entries(data[0]).forEach((pair) => {
-        const [key] = pair;
-        drawLine(svg, data, ["date", key]);
-    });
+interface Config {
+    width: number;
+    height: number;
+    margins: Margins;
+}
+
+interface IDateValue {
+    date: Date;
+    value: number;
+}
+
+type D3Selection = d3.Selection<SVGGElement, unknown, null, any>;
+
+const drawLine = (svg: D3Selection, data: IDateValue[], scales: Scales, color: string) => {
+    const line = d3
+        .line<IDateValue>()
+        .x((d) => scales.xScale(d.date))
+        .y((d) => scales.yScale(d.value));
+
+    svg.append("path").data([data]).attr("class", "line").attr("d", line).attr("stroke", color);
 };
 
-const drawLine = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[], axisLabel: AxisLabel) => {
-    const [xLabel, yLabel] = axisLabel;
-    const valueLine = d3
-        .line<IDateValues>()
-        .x((d) => (d?.date ? X_SCALE(d[xLabel]) : 0))
-        .y((d) => Y_SCALE(d[yLabel]));
-    svg.append("path")
-        .data([data])
-        .attr("class", "line-" + yLabel)
-        .attr("d", valueLine)
-        .attr("stroke", d3.schemeAccent[lastColorIndex]);
-    lastColorIndex++;
-};
+const createGraph = (rootElement: HTMLDivElement, config: Config) => {
+    const {
+        width,
+        height,
+        margins: { top, right, bottom, left },
+    } = config;
 
-const drawAllDots = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[]) => {
-    Object.entries(data[0]).forEach((pair) => {
-        const [key] = pair;
-        drawDots(svg, data, ["date", key]);
-    });
-};
+    const xScale = d3.scaleTime().range([left, width - right]);
+    const yScale = d3.scaleLinear().range([height - bottom, top]);
 
-const drawDots = (svg: d3.Selection<SVGGElement, unknown, null, any>, data: IDateValues[], axisLabel: AxisLabel) => {
-    const [xLabel, yLabel] = axisLabel;
-    const dots = svg.append("g").attr("class", "dots").selectAll("circle").data(data);
-    dots.enter()
-        .append("circle")
-        .attr("cx", (d) => (d?.date ? X_SCALE(d[xLabel]) : 0))
-        .attr("cy", (d) => Y_SCALE(d[yLabel]))
-        .attr("r", RADIUS)
-        .attr("fill", d3.schemeAccent[lastColorIndex])
-        .on("mouseover", displayTooltip)
-        .on("mouseout", hideTooltip)
-        .on("mousemove", moveTooltip);
-    lastColorIndex++;
-};
-
-const displayTooltip = (_e: any, d: IDateValues) => {
-    const { date, ...rest } = d;
-
-    let result = "<ul>";
-    Object.entries(rest).forEach((pair) => {
-        const [key, value] = pair;
-        result += `<li>${key}: ${value}</li>`;
-    });
-    result += "</ul>";
-
-    d3.select("div#tooltip").style("opacity", 1).html(result);
-};
-
-const hideTooltip = () => {
-    d3.select("div#tooltip").style("opacity", 0);
-};
-
-const moveTooltip = (e: any) => {
-    d3.select("div#tooltip")
-        .style("left", e.clientX + 10 + "px")
-        .style("top", e.clientY + 10 + "px");
-};
-
-const createGraph = async (rootElement: HTMLDivElement) => {
-    let data = dateAmount.split("\n").map((row) => {
-        const [date, close, open] = row.split(",");
-        return {
-            date,
-            close,
-            open,
-        };
-    });
-
-    let parsedData: IDateValues[] = [];
-    data.forEach((d) => {
+    let parsedData: IDateValue[] = [];
+    dataset.forEach((d) => {
         parsedData.push({
             date: d3.timeParse("%d-%b-%y")(d.date) as Date,
-            close: parseFloat(d.close),
-            open: parseFloat(d.open),
+            value: parseFloat(d.value),
         });
-    });
-
-    parsedData = parsedData.sort((a, b) => {
-        if (a?.date !== null && b?.date) {
-            return a.date.getTime() - b.date.getTime();
-        } else {
-            return 0;
-        }
     });
 
     const minDate = d3.min(parsedData, (d) => d.date);
     const maxDate = d3.max(parsedData, (d) => d.date);
     if (minDate && maxDate) {
-        X_SCALE.domain([minDate, maxDate]);
+        xScale.domain([minDate, maxDate]);
     }
 
-    const maxClose = d3.max(parsedData, (d) => d.close);
-    if (maxClose) {
-        Y_SCALE.domain([0, maxClose]);
+    const maxYValue = d3.max(parsedData, (d) => d.value);
+    if (maxYValue) {
+        yScale.domain([0, maxYValue]);
     }
 
-    // canvas
-    const svg = d3
-        .select(rootElement)
-        .html("")
-        .append("svg")
-        .attr("width", WIDTH + MARGINS.left + MARGINS.right)
-        .attr("height", HEIGHT + MARGINS.top + MARGINS.bottom)
-        .append("g")
-        .attr("transform", `translate(${MARGINS.left}, ${MARGINS.top})`);
+    const svg = d3.select(rootElement).html("").append("svg").attr("width", width).attr("height", height).append("g");
 
-    drawAllLines(svg, parsedData);
-
-    lastColorIndex = 0;
-
-    drawAllDots(svg, parsedData);
-
-    // axis
-    svg.append("g").attr("transform", `translate(0, ${HEIGHT})`).call(d3.axisBottom(X_SCALE));
-    svg.append("g").call(d3.axisLeft(Y_SCALE));
-
-    // tooltip
-    d3.select("body").append("div").attr("id", "tooltip");
+    drawLine(svg, parsedData, { xScale, yScale }, d3.schemeAccent[0]);
 };
 
 const App = () => {
     const ref = useRef<HTMLDivElement>(null);
 
+    const config: Config = useMemo(
+        () => ({
+            width: 200,
+            height: 150,
+            margins: { top: 10, right: 10, bottom: 10, left: 10 },
+        }),
+        []
+    );
+
     useEffect(() => {
         if (ref.current) {
-            createGraph(ref.current);
+            createGraph(ref.current, config);
         }
-    }, [ref]);
+    }, [ref, config]);
 
     return (
         <div ref={ref}>
-            <svg />
             <Styling />
         </div>
     );
